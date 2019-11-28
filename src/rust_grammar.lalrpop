@@ -1,0 +1,107 @@
+use std::str::FromStr;
+
+use crate::ast::*;
+
+grammar;
+
+// Entry-point.
+pub Module: Module = {
+    <ss:Stmt*> => Module { statements: ss.into_iter().map(|boxed| *boxed).collect(), }
+}
+
+Stmt: Box<Stmt> = {
+    "enum" <id:CtorIdentifier> "{" <cs:EnumConstructorList> "}" => Box::new(Stmt::Enum(id, cs)),
+    "let" <id:Identifier> ":" <t:Type> "=" <e:Expr> ";" => Box::new(Stmt::Let(id, t, e)),
+    <e:Expr> => Box::new(Stmt::Expression(e)),
+}
+
+EnumConstructorList = CommaList<EnumConstructor>;
+
+EnumConstructor: EnumConstructor = {
+    <id:CtorIdentifier> => EnumConstructor { name: id },
+}
+
+Type: Box<Type> = {
+    <id:CtorIdentifier> => Box::new(Type::Variable(id)),
+    "bool" => Box::new(Type::Bool),
+    "i32" => Box::new(Type::Int),
+}
+
+Expr: Box<Expr> = {
+    <e1:Expr> <op:ComparisonOp> <e2:Term> => Box::new(Expr::Binary(e1, op, e2)),
+    <t:Term> => t,
+}
+
+ComparisonOp: BinaryOperator = {
+    "==" => BinaryOperator::Equal,
+    "!=" => BinaryOperator::NotEqual,
+    "<" => BinaryOperator::Less,
+    "<=" => BinaryOperator::LessOrEqual,
+    ">" => BinaryOperator::Greater,
+    ">=" => BinaryOperator::GreaterOrEqual,
+}
+
+Term: Box<Expr> = {
+    <e1:Term> <op:TermOp> <e2:Factor> => Box::new(Expr::Binary(e1, op, e2)),
+    <f:Factor> => f,
+}
+
+TermOp: BinaryOperator = {
+    "+" => BinaryOperator::Plus,
+    "-" => BinaryOperator::Minus,
+}
+
+Factor: Box<Expr> = {
+    <e1:Factor> <op:FactorOp> <e2:Primary> => Box::new(Expr::Binary(e1, op, e2)),
+    <t:Primary> => t,
+}
+
+FactorOp: BinaryOperator = {
+    "*" => BinaryOperator::Times,
+    "/" => BinaryOperator::DividedBy,
+}
+
+Primary: Box<Expr> = {
+    "match" <e:Expr> "{" <arms:MatchArmList> "}" => Box::new(Expr::Match(e, arms)),
+    <n:IntegralNum> => Box::new(Expr::LiteralInt(n)),
+    <x:Bool> => Box::new(Expr::LiteralBool(x)),
+    <id:CtorIdentifier> => Box::new(Expr::Variable(id)),
+    <id:Identifier> => Box::new(Expr::Variable(id)),
+    "(" <e:Expr> ")" => Box::new(Expr::Grouping(e)),
+}
+
+MatchArmList = CommaList<MatchArm>;
+
+MatchArm: MatchArm = {
+    <p:Pattern> "=>" <e:Expr> => MatchArm { pattern: p, body: *e },
+}
+
+Pattern: Pattern = {
+    <id:CtorIdentifier> => Pattern::Constructor(id),
+    <id:Identifier> => Pattern::Binding(id),
+    <x:Bool> => Pattern::LiteralBool(x),
+    <n:IntegralNum> => Pattern::LiteralInt(n),
+}
+
+Bool: bool = {
+    "true" => true,
+    "false" => false,
+}
+
+// Macro to parse a comma-separated list of anything.
+CommaList<T>: Vec<T> = {
+    <v:(<T> ",")*> <e:T?> => match e {
+        None => v,
+        Some(e) => {
+            let mut v = v;
+            v.push(e);
+            v
+        }
+    }
+}
+
+IntegralNum: i32 = <s:r"0|-?[1-9][0-9]*"> => i32::from_str(s).expect("Expected decimal integer digits");
+Identifier: String = <s:r"[a-z_][a-zA-Z_\d]*"> => s.to_string();
+// Constructors start with a capital letter.  The distinction is needed for
+// patterns.
+CtorIdentifier: String = <s:r"[A-Z][a-zA-Z_\d]*"> => s.to_string();
