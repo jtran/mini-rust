@@ -68,6 +68,7 @@ Primary: Box<Expr> = {
     <id:CtorIdentifier> => Box::new(Expr::Variable(id)),
     <id:Identifier> => Box::new(Expr::Variable(id)),
     "(" <e:Expr> ")" => Box::new(Expr::Grouping(e)),
+    "(" ")" => Box::new(Expr::Tuple0),
 }
 
 MatchArmList = CommaList<MatchArm>;

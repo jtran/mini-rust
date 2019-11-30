@@ -175,6 +175,7 @@ impl TypeChecker {
             }
             Expr::LiteralInt(_) => Ok(Type::Int),
             Expr::LiteralBool(_) => Ok(Type::Bool),
+            Expr::Tuple0 => Ok(Type::Unit),
             Expr::Variable(id) => {
                 match self.ctx.lookup(id) {
                     Some(t) => Ok(t.clone()),
@@ -202,6 +203,7 @@ impl TypeChecker {
             Type::Bool => Ok(Type::Bool),
             Type::Int => Ok(Type::Int),
             Type::NamedType(id) => Ok(Type::NamedType(id.to_string())),
+            Type::Unit => Ok(Type::Unit),
             Type::Variable(id) => self.ctx.lookup_type(id).cloned().ok_or_else(|| TypeErrorCause::new(&format!("Unknown type: {}", id))),
         }
     }

@@ -17,6 +17,7 @@ pub enum Type {
     Bool,
     Int,
     NamedType(Identifier),
+    Unit,
     Variable(Identifier),
 }
 
@@ -32,6 +33,7 @@ pub enum Expr {
     Match(Box<Expr>, Vec<MatchArm>),
     LiteralInt(i32),
     LiteralBool(bool),
+    Tuple0,
     Variable(Identifier),
 }
 
