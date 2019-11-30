@@ -30,6 +30,22 @@ is_one
 #[test]
 fn test_type_check() {
     let module = rust_grammar::ModuleParser::new().parse("
+let mut x: i32 = 0;
+x = x + 1;
+        ").unwrap();
+    assert!(type_checker::check(&module).is_ok());
+    let module = rust_grammar::ModuleParser::new().parse("
+let mut x: i32 = 0;
+x = true;
+        ").unwrap();
+    assert!(type_checker::check(&module).is_err());
+    let module = rust_grammar::ModuleParser::new().parse("
+let x: i32 = 0;
+x = 1;
+        ").unwrap();
+    assert!(type_checker::check(&module).is_err());
+
+    let module = rust_grammar::ModuleParser::new().parse("
 enum Size {
     Zero,
     One,

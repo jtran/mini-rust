@@ -8,7 +8,7 @@ pub struct Module {
 #[derive(Clone, Debug, PartialEq)]
 pub enum Stmt {
     Enum(Identifier, Vec<EnumConstructor>),
-    Let(Identifier, Box<Type>, Box<Expr>),
+    Let(BindingModifier, Identifier, Box<Type>, Box<Expr>),
     Expression(Box<Expr>),
 }
 
@@ -28,6 +28,7 @@ pub struct EnumConstructor {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Expr {
+    Assignment(Box<Expr>, Box<Expr>),
     Binary(Box<Expr>, BinaryOperator, Box<Expr>),
     Grouping(Box<Expr>),
     Match(Box<Expr>, Vec<MatchArm>),
@@ -49,6 +50,12 @@ pub enum Pattern {
     Binding(Identifier),
     LiteralBool(bool),
     LiteralInt(i32),
+}
+
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum BindingModifier {
+    Plain,
+    Mutable,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]

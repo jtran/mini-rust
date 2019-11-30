@@ -60,11 +60,15 @@ impl TypeChecker {
                 }
                 Ok(())
             }
-            Stmt::Let(id, t, e) => {
+            Stmt::Let(bind_mod, id, t, e) => {
                 let lhs_type = self.eval_type(t)?;
                 let rhs_type_result = self.check_expression(e);
 
                 self.ctx.define(id.to_string(), lhs_type.clone());
+                match bind_mod {
+                    BindingModifier::Plain => (),
+                    BindingModifier::Mutable => self.ctx.define_mutable(id.to_string(), lhs_type.clone()),
+                }
 
                 // Check the result after defining so that if there was a type
                 // error, the identifier will still be defined for later code
@@ -83,6 +87,26 @@ impl TypeChecker {
 
     fn check_expression(&mut self, expression: &Expr, ) -> Result<Type, TypeErrorCause> {
         match expression {
+            Expr::Assignment(e1, e2) => {
+                self.check_expression(e1)?;
+                let t2 = self.check_expression(e2)?;
+
+                let id = match &**e1 {
+                    Expr::Variable(id) => id,
+                    _ => return Err(TypeErrorCause::new(&format!("Expected variable on left hand side of assignment, but found: {:?}", e1))),
+                };
+
+                match self.ctx.lookup_mutable(id) {
+                    Some(t_expected) => {
+                        if *t_expected != t2 {
+                            return Err(TypeErrorCause::new(&format!("Left hand side of assignment expects type {:?} but right hand side has type {:?}", t_expected, t2)));
+                        }
+                    }
+                    None => return Err(TypeErrorCause::new(&format!("Expected mutable variable on left hand side of assignment: {}", id))),
+                }
+
+                Ok(Type::Unit)
+            }
             Expr::Binary(e1, op, e2) => {
                 let t1 = self.check_expression(e1)?;
                 let t2 = self.check_expression(e2)?;
@@ -213,6 +237,7 @@ impl TypeChecker {
 struct Context {
     exprs: HashMap<String, Type>,
     types: HashMap<String, Type>,
+    mutables: HashMap<String, Type>,
 }
 
 impl Context {
@@ -220,6 +245,7 @@ impl Context {
         Context {
             exprs: HashMap::new(),
             types: HashMap::new(),
+            mutables: HashMap::new(),
         }
     }
 
@@ -231,11 +257,19 @@ impl Context {
         self.types.insert(id, typ);
     }
 
+    pub fn define_mutable(&mut self, id: String, typ: Type) {
+        self.mutables.insert(id, typ);
+    }
+
     pub fn lookup(&self, id: &str) -> Option<&Type> {
         self.exprs.get(id)
     }
 
     pub fn lookup_type(&self, id: &str) -> Option<&Type> {
         self.types.get(id)
+    }
+
+    pub fn lookup_mutable(&self, id: &str) -> Option<&Type> {
+        self.mutables.get(id)
     }
 }

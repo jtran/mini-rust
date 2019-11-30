@@ -11,8 +11,8 @@ pub Module: Module = {
 
 Stmt: Box<Stmt> = {
     "enum" <id:CtorIdentifier> "{" <cs:EnumConstructorList> "}" => Box::new(Stmt::Enum(id, cs)),
-    "let" <id:Identifier> ":" <t:Type> "=" <e:Expr> ";" => Box::new(Stmt::Let(id, t, e)),
-    <e:Expr> => Box::new(Stmt::Expression(e)),
+    "let" <b:OptionalBindingModifier> <id:Identifier> ":" <t:Type> "=" <e:Expr> ";" => Box::new(Stmt::Let(b, id, t, e)),
+    <e:Expr> (";"?) => Box::new(Stmt::Expression(e)),
 }
 
 EnumConstructorList = CommaList<EnumConstructor>;
@@ -28,7 +28,12 @@ Type: Box<Type> = {
 }
 
 Expr: Box<Expr> = {
-    <e1:Expr> <op:ComparisonOp> <e2:Term> => Box::new(Expr::Binary(e1, op, e2)),
+    <e1:Expr> "=" <e2:Comparison> => Box::new(Expr::Assignment(e1, e2)),
+    <t:Comparison> => t,
+}
+
+Comparison: Box<Expr> = {
+    <e1:Comparison> <op:ComparisonOp> <e2:Term> => Box::new(Expr::Binary(e1, op, e2)),
     <t:Term> => t,
 }
 
@@ -82,6 +87,14 @@ Pattern: Pattern = {
     <id:Identifier> => Pattern::Binding(id),
     <x:Bool> => Pattern::LiteralBool(x),
     <n:IntegralNum> => Pattern::LiteralInt(n),
+}
+
+OptionalBindingModifier: BindingModifier = {
+    <b:BindingModifier?> => b.unwrap_or(BindingModifier::Plain),
+}
+
+BindingModifier: BindingModifier = {
+    "mut" => BindingModifier::Mutable,
 }
 
 Bool: bool = {
