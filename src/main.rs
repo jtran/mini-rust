@@ -3,9 +3,11 @@ extern crate argparse;
 extern crate lalrpop_util;
 
 mod ast;
+mod type_checker;
 
 use std::fs::File;
 use std::io::prelude::*;
+use std::process;
 
 use argparse::{ArgumentParser, Print, Store};
 
@@ -42,8 +44,25 @@ fn main() {
         .unwrap_or_else(|_| panic!("Unable to read file: {}", script_filename));
     // Parse.
     let result = rust_grammar::ModuleParser::new().parse(&contents);
+    let code = match result {
+        Ok(ast) => {
+            println!("{:#?}", ast);
+            ast
+        }
+        Err(e) => {
+            eprintln!("Parse error: {}", e);
+            process::exit(65);
+        }
+    };
+    // Type check.
+    let result = type_checker::check(&code);
     match result {
-        Ok(ast) => println!("{:#?}", ast),
-        Err(e) => eprintln!("Parse error: {}", e),
+        Ok(()) => (),
+        Err(error) => {
+            for cause in error.causes {
+                eprintln!("Type error: {}", cause.message);
+            }
+            process::exit(65);
+        }
     }
 }

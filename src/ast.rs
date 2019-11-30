@@ -16,6 +16,7 @@ pub enum Stmt {
 pub enum Type {
     Bool,
     Int,
+    NamedType(Identifier),
     Variable(Identifier),
 }
 
