@@ -23,7 +23,7 @@ let is_one: bool = match size {
     x => false,
 };
 
-is_one
+is_one;
         ").is_ok());
 }
 
@@ -65,7 +65,7 @@ let is_one: bool = match size {
     x => false,
 };
 
-is_one
+is_one;
         ").unwrap();
     assert!(type_checker::check(&module).is_ok());
     let module = rust_grammar::ModuleParser::new().parse("
@@ -130,4 +130,23 @@ let truthy: bool = match true {
 };
         ").unwrap();
     assert!(type_checker::check(&module).is_err());
+}
+
+#[test]
+fn test_type_check_borrow() {
+    let module = rust_grammar::ModuleParser::new().parse("
+let x: i32 = 0;
+let y: &i32 = &x;
+        ").unwrap();
+    assert!(type_checker::check(&module).is_ok());
+}
+
+#[test]
+fn test_type_check_dereference() {
+    let module = rust_grammar::ModuleParser::new().parse("
+let x: i32 = 0;
+let y: &i32 = &x;
+let z: i32 = *y;
+        ").unwrap();
+    assert!(type_checker::check(&module).is_ok());
 }

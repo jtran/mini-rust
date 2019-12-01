@@ -12,7 +12,7 @@ pub Module: Module = {
 Stmt: Box<Stmt> = {
     "enum" <id:CtorIdentifier> "{" <cs:EnumConstructorList> "}" => Box::new(Stmt::Enum(id, cs)),
     "let" <b:OptionalBindingModifier> <id:Identifier> ":" <t:Type> "=" <e:Expr> ";" => Box::new(Stmt::Let(b, id, t, e)),
-    <e:Expr> (";"?) => Box::new(Stmt::Expression(e)),
+    <e:Expr> ";" => Box::new(Stmt::Expression(e)),
 }
 
 EnumConstructorList = CommaList<EnumConstructor>;
@@ -23,6 +23,7 @@ EnumConstructor: EnumConstructor = {
 
 Type: Box<Type> = {
     <id:CtorIdentifier> => Box::new(Type::Variable(id)),
+    "&" <t:Type> => Box::new(Type::Ref(t)),
     "bool" => Box::new(Type::Bool),
     "i32" => Box::new(Type::Int),
 }
@@ -57,13 +58,19 @@ TermOp: BinaryOperator = {
 }
 
 Factor: Box<Expr> = {
-    <e1:Factor> <op:FactorOp> <e2:Primary> => Box::new(Expr::Binary(e1, op, e2)),
-    <t:Primary> => t,
+    <e1:Factor> <op:FactorOp> <e2:Unary> => Box::new(Expr::Binary(e1, op, e2)),
+    <t:Unary> => t,
 }
 
 FactorOp: BinaryOperator = {
     "*" => BinaryOperator::Times,
     "/" => BinaryOperator::DividedBy,
+}
+
+Unary: Box<Expr> = {
+    "&" <e:Unary> => Box::new(Expr::Borrow(e)),
+    "*" <e:Unary> => Box::new(Expr::Deref(e)),
+    <e:Primary> => e,
 }
 
 Primary: Box<Expr> = {

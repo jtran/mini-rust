@@ -17,6 +17,7 @@ pub enum Type {
     Bool,
     Int,
     NamedType(Identifier),
+    Ref(Box<Type>),
     Unit,
     Variable(Identifier),
 }
@@ -30,6 +31,8 @@ pub struct EnumConstructor {
 pub enum Expr {
     Assignment(Box<Expr>, Box<Expr>),
     Binary(Box<Expr>, BinaryOperator, Box<Expr>),
+    Borrow(Box<Expr>),
+    Deref(Box<Expr>),
     Grouping(Box<Expr>),
     Match(Box<Expr>, Vec<MatchArm>),
     LiteralInt(i32),

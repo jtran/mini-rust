@@ -133,6 +133,27 @@ impl TypeChecker {
                     }
                 }
             }
+            Expr::Borrow(e) => {
+                let t = self.check_expression(e)?;
+
+                if self.is_place_expression(e) {
+                    Ok(Type::Ref(Box::new(t)))
+                } else {
+                    Err(TypeErrorCause::new(&format!("Expected place expression (like a local variable) after the borrow operator \"&\" but found: {:?}", e)))
+                }
+            }
+            Expr::Deref(e) => {
+                let t = self.check_expression(e)?;
+
+                if self.is_place_expression(e) {
+                    match t {
+                        Type::Ref(t_inner) => Ok(*t_inner),
+                        _ => Err(TypeErrorCause::new(&format!("Dereference operator \"*\" expected a reference but found: {:?}", t))),
+                    }
+                } else {
+                    Err(TypeErrorCause::new(&format!("Expected place expression (like a local variable) after the dereference operator \"*\" but found: {:?}", e)))
+                }
+            }
             Expr::Grouping(e) => self.check_expression(e),
             Expr::Match(e, arms) => {
                 let t = self.check_expression(e)?;
@@ -219,6 +240,24 @@ impl TypeChecker {
         result
     }
 
+    // A place expression is an expression that represents a memory location.
+    //
+    // See https://doc.rust-lang.org/reference/expressions.html#place-expressions-and-value-expressions
+    fn is_place_expression(&mut self, expression: &Expr) -> bool {
+        use Expr::*;
+        match expression {
+            Grouping(e) => self.is_place_expression(e),
+            Assignment(_, _)
+            | Binary(_, _, _)
+            | Borrow(_)
+            | Match(_, _)
+            | LiteralInt(_)
+            | LiteralBool(_)
+            | Tuple0 => false,
+            Variable(_) | Deref(_) => true,
+        }
+    }
+
     // Evaluating types isn't so involved right now.  But if we ever add
     // higher-kinded types -- for example, generic data types -- we will
     // absolutely need it.
@@ -227,6 +266,10 @@ impl TypeChecker {
             Type::Bool => Ok(Type::Bool),
             Type::Int => Ok(Type::Int),
             Type::NamedType(id) => Ok(Type::NamedType(id.to_string())),
+            Type::Ref(t) => {
+                let t_evaled = self.eval_type(t)?;
+                Ok(Type::Ref(Box::new(t_evaled)))
+            }
             Type::Unit => Ok(Type::Unit),
             Type::Variable(id) => self.ctx.lookup_type(id).cloned().ok_or_else(|| TypeErrorCause::new(&format!("Unknown type: {}", id))),
         }
