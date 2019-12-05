@@ -166,7 +166,7 @@ impl TypeChecker {
                         Pattern::Constructor(ctor_id) => {
                             let ctor_type = self.ctx.lookup(&ctor_id).ok_or_else(|| TypeErrorCause::new(&format!("Unknown constructor in pattern: {}", ctor_id)))?;
                             if *ctor_type != t {
-                                return Err(TypeErrorCause::new(&format!("Constructor pattern {} of type {:?} does not match condition type {:?}", ctor_id, ctor_type, t)));
+                                return Err(TypeErrorCause::new(&format!("Constructor pattern {} of type {:?} does not match discriminant type {:?}", ctor_id, ctor_type, t)));
                             }
                         }
                         Pattern::Binding(id) => {
@@ -175,20 +175,20 @@ impl TypeChecker {
                             new_ctx.define(id.to_string(), t.clone());
                             ctx_to_drop = Some(new_ctx);
                             if found_catch_all {
-                                return Err(TypeErrorCause::new(&format!("Match branches should never have more than one catch-all pattern: {}", id)));
+                                return Err(TypeErrorCause::new(&format!("Match arms should never have more than one catch-all pattern: {}", id)));
                             }
                             found_catch_all = true;
                         }
                         Pattern::LiteralBool(_) => {
                             let ctor_type = Type::Bool;
                             if ctor_type != t {
-                                return Err(TypeErrorCause::new(&format!("Pattern literal of type {:?} does not match condition type {:?}", ctor_type, t)));
+                                return Err(TypeErrorCause::new(&format!("Pattern literal of type {:?} does not match discriminant type {:?}", ctor_type, t)));
                             }
                         }
                         Pattern::LiteralInt(_) => {
                             let ctor_type = Type::Int;
                             if ctor_type != t {
-                                return Err(TypeErrorCause::new(&format!("Pattern literal of type {:?} does not match condition type {:?}", ctor_type, t)));
+                                return Err(TypeErrorCause::new(&format!("Pattern literal of type {:?} does not match discriminant type {:?}", ctor_type, t)));
                             }
                         }
                     };
@@ -206,16 +206,16 @@ impl TypeChecker {
 
                 match arm_types.first() {
                     Some(t) => {
-                        // Check that all branches are the same.
+                        // Check that all arms are the same.
                         for arm_type in arm_types.iter() {
                             if *arm_type != *t {
-                                return Err(TypeErrorCause::new(&format!("Match arm result type {:?} does not match previous branch type {:?}", arm_type, *t)))
+                                return Err(TypeErrorCause::new(&format!("Match arm result type {:?} does not match previous arm type {:?}", arm_type, *t)))
                             }
                         }
 
                         Ok(t.clone())
                     }
-                    None => Err(TypeErrorCause::new("Match has no arm branches")),
+                    None => Err(TypeErrorCause::new("Match has no arms")),
                 }
             }
             Expr::LiteralInt(_) => Ok(Type::Int),
