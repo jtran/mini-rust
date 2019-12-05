@@ -133,11 +133,11 @@ impl TypeChecker {
                     }
                 }
             }
-            Expr::Borrow(e) => {
+            Expr::AddressOf(e) => {
                 let t = self.check_expression(e)?;
 
                 if self.is_place_expression(e) {
-                    Ok(Type::Ref(Box::new(t)))
+                    Ok(Type::RefPtr(Box::new(t)))
                 } else {
                     Err(TypeErrorCause::new(&format!("Expected place expression (like a local variable) after the borrow operator \"&\" but found: {:?}", e)))
                 }
@@ -147,7 +147,7 @@ impl TypeChecker {
 
                 if self.is_place_expression(e) {
                     match t {
-                        Type::Ref(t_inner) => Ok(*t_inner),
+                        Type::RefPtr(t_inner) => Ok(*t_inner),
                         _ => Err(TypeErrorCause::new(&format!("Dereference operator \"*\" expected a reference but found: {:?}", t))),
                     }
                 } else {
@@ -249,7 +249,7 @@ impl TypeChecker {
             Grouping(e) => self.is_place_expression(e),
             Assignment(_, _)
             | Binary(_, _, _)
-            | Borrow(_)
+            | AddressOf(_)
             | Match(_, _)
             | LiteralInt(_)
             | LiteralBool(_)
@@ -266,9 +266,9 @@ impl TypeChecker {
             Type::Bool => Ok(Type::Bool),
             Type::Int => Ok(Type::Int),
             Type::NamedType(id) => Ok(Type::NamedType(id.to_string())),
-            Type::Ref(t) => {
+            Type::RefPtr(t) => {
                 let t_evaled = self.eval_type(t)?;
-                Ok(Type::Ref(Box::new(t_evaled)))
+                Ok(Type::RefPtr(Box::new(t_evaled)))
             }
             Type::Unit => Ok(Type::Unit),
             Type::Variable(id) => self.ctx.lookup_type(id).cloned().ok_or_else(|| TypeErrorCause::new(&format!("Unknown type: {}", id))),

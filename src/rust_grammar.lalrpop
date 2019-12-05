@@ -23,7 +23,7 @@ EnumConstructor: EnumConstructor = {
 
 Type: Box<Type> = {
     <id:CtorIdentifier> => Box::new(Type::Variable(id)),
-    "&" <t:Type> => Box::new(Type::Ref(t)),
+    "&" <t:Type> => Box::new(Type::RefPtr(t)),
     "bool" => Box::new(Type::Bool),
     "i32" => Box::new(Type::Int),
 }
@@ -58,8 +58,8 @@ TermOp: BinaryOperator = {
 }
 
 Factor: Box<Expr> = {
-    <e1:Factor> <op:FactorOp> <e2:Unary> => Box::new(Expr::Binary(e1, op, e2)),
-    <t:Unary> => t,
+    <e1:Factor> <op:FactorOp> <e2:Prefix> => Box::new(Expr::Binary(e1, op, e2)),
+    <t:Prefix> => t,
 }
 
 FactorOp: BinaryOperator = {
@@ -67,9 +67,9 @@ FactorOp: BinaryOperator = {
     "/" => BinaryOperator::DividedBy,
 }
 
-Unary: Box<Expr> = {
-    "&" <e:Unary> => Box::new(Expr::Borrow(e)),
-    "*" <e:Unary> => Box::new(Expr::Deref(e)),
+Prefix: Box<Expr> = {
+    "&" <e:Prefix> => Box::new(Expr::AddressOf(e)),
+    "*" <e:Prefix> => Box::new(Expr::Deref(e)),
     <e:Primary> => e,
 }
 
