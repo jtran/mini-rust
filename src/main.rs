@@ -3,6 +3,7 @@ extern crate argparse;
 extern crate lalrpop_util;
 
 mod ast;
+mod borrow_checker;
 mod type_checker;
 
 use std::fs::File;
@@ -61,6 +62,17 @@ fn main() {
         Err(error) => {
             for cause in error.causes {
                 eprintln!("Type error: {}", cause.message);
+            }
+            process::exit(65);
+        }
+    }
+    // Type check.
+    let result = borrow_checker::check(&code);
+    match result {
+        Ok(()) => (),
+        Err(error) => {
+            for cause in error.causes {
+                eprintln!("Borrow error: {}", cause.message);
             }
             process::exit(65);
         }

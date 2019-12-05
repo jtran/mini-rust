@@ -1,3 +1,4 @@
+use crate::borrow_checker;
 use crate::rust_grammar;
 use crate::type_checker;
 
@@ -149,4 +150,28 @@ let y: &i32 = &x;
 let z: i32 = *y;
         ").unwrap();
     assert!(type_checker::check(&module).is_ok());
+}
+
+#[test]
+fn test_borrow_check_read_borrowed() {
+    let module = rust_grammar::ModuleParser::new().parse("
+let x: i32 = 0;
+let y: &i32 = &x;
+x;
+*y;
+        ").unwrap();
+    assert!(type_checker::check(&module).is_ok());
+    assert!(borrow_checker::check(&module).is_ok());
+}
+
+#[test]
+fn test_borrow_check_write_to_shared_borrowed() {
+    let module = rust_grammar::ModuleParser::new().parse("
+let mut x: i32 = 0;
+let y: &i32 = &x;
+x = 1;
+*y;
+        ").unwrap();
+    assert!(type_checker::check(&module).is_ok());
+    assert!(borrow_checker::check(&module).is_err());
 }
