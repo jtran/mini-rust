@@ -55,16 +55,15 @@ impl BorrowChecker {
         match statement {
             Stmt::Enum(_, _) => Ok(()),
             Stmt::Let(_, id, t, e) => {
-                let loans = self.check_expression(e)?;
+                self.check_expression(e)?;
 
                 match **t {
                     Type::RefPtr(_) => {
                         let loan = self.ctx.new_loan();
                         let path = Path::from(id);
                         self.ctx.add_loan(loan, path.clone(), LoanState::Borrowed, BorrowType::Shared);
-                        eprintln!("Adding active borrows path={:?}, loans={:?}", path, loans);
+                        eprintln!("Adding active borrows path={:?}, loan={:?}", path, loan);
                         self.ctx.add_active_borrow(path.clone(), &vec![loan]);
-                        self.ctx.add_active_borrow(path.clone(), &loans);
                     }
                     _ => (),
                 }
