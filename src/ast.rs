@@ -1,4 +1,4 @@
-type Identifier = String;
+pub type Identifier = String;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Module {
@@ -17,7 +17,7 @@ pub enum Type {
     Bool,
     Int,
     NamedType(Identifier),
-    RefPtr(Box<Type>),
+    RefPtr(RefPtrKind, Box<Type>),
     Unit,
     Variable(Identifier),
 }
@@ -29,9 +29,9 @@ pub struct EnumConstructor {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Expr {
+    AddressOf(RefPtrKind, Box<Expr>),
     Assignment(Box<Expr>, Box<Expr>),
     Binary(Box<Expr>, BinaryOperator, Box<Expr>),
-    AddressOf(Box<Expr>),
     Deref(Box<Expr>),
     Grouping(Box<Expr>),
     Match(Box<Expr>, Vec<MatchArm>),
@@ -53,6 +53,12 @@ pub enum Pattern {
     Binding(Identifier),
     LiteralBool(bool),
     LiteralInt(i32),
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum RefPtrKind {
+    Shared,
+    Mutable,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]

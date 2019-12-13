@@ -23,7 +23,7 @@ EnumConstructor: EnumConstructor = {
 
 Type: Box<Type> = {
     <id:CtorIdentifier> => Box::new(Type::Variable(id)),
-    "&" <t:Type> => Box::new(Type::RefPtr(t)),
+    "&" <k:OptionalRefPtrModifier> <t:Type> => Box::new(Type::RefPtr(k, t)),
     "bool" => Box::new(Type::Bool),
     "i32" => Box::new(Type::Int),
 }
@@ -68,7 +68,7 @@ FactorOp: BinaryOperator = {
 }
 
 Prefix: Box<Expr> = {
-    "&" <e:Prefix> => Box::new(Expr::AddressOf(e)),
+    "&" <m:OptionalRefPtrModifier> <e:Prefix> => Box::new(Expr::AddressOf(m, e)),
     "*" <e:Prefix> => Box::new(Expr::Deref(e)),
     <e:Primary> => e,
 }
@@ -94,6 +94,14 @@ Pattern: Pattern = {
     <id:Identifier> => Pattern::Binding(id),
     <x:Bool> => Pattern::LiteralBool(x),
     <n:IntegralNum> => Pattern::LiteralInt(n),
+}
+
+OptionalRefPtrModifier: RefPtrKind = {
+    <m:RefPtrModifier?> => m.unwrap_or(RefPtrKind::Shared),
+}
+
+RefPtrModifier: RefPtrKind = {
+    "mut" => RefPtrKind::Mutable,
 }
 
 OptionalBindingModifier: BindingModifier = {

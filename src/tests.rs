@@ -175,3 +175,29 @@ x = 1;
     assert!(type_checker::check(&module).is_ok());
     assert!(borrow_checker::check(&module).is_err());
 }
+
+#[test]
+fn test_borrow_check_write_to_mutable_borrowed() {
+    let module = rust_grammar::ModuleParser::new().parse("
+let mut x: i32 = 0;
+let y: &mut i32 = &mut x;
+*y = 1;
+        ").unwrap();
+    assert_eq!(type_checker::check(&module), Ok(()));
+    assert_eq!(borrow_checker::check(&module), Ok(()));
+}
+
+#[test]
+fn test_borrow_check_write_to_mutable_borrowed_with_dynamic_source() {
+    let module = rust_grammar::ModuleParser::new().parse("
+let mut x: i32 = 0;
+let mut y: i32 = 1;
+let r: &mut i32 = match 0 {
+    0 => &mut x,
+    n => &mut y,
+};
+*r = 1;
+        ").unwrap();
+    assert_eq!(type_checker::check(&module), Ok(()));
+    assert_eq!(borrow_checker::check(&module), Ok(()));
+}

@@ -1,5 +1,8 @@
 use std::collections::HashMap;
+use std::convert::TryFrom;
+use std::fmt;
 use std::mem;
+use std::ops::Deref;
 
 use crate::ast::*;
 
@@ -9,10 +12,12 @@ pub fn check(module: &Module) -> Result<(), TypeError> {
     checker.check(&module)
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TypeError {
     pub causes: Vec<TypeErrorCause>,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TypeErrorCause {
     pub message: String,
 }
@@ -67,7 +72,18 @@ impl TypeChecker {
                 self.ctx.define(id.to_string(), lhs_type.clone());
                 match bind_mod {
                     BindingModifier::Plain => (),
-                    BindingModifier::Mutable => self.ctx.define_mutable(id.to_string(), lhs_type.clone()),
+                    BindingModifier::Mutable => {
+                        let path = Path::Ident(id.to_string());
+                        self.ctx.define_mutable(path, lhs_type.clone())
+                    }
+                }
+
+                match self.mutable_path_and_type_from_type(id.to_string(), &lhs_type) {
+                    None => (),
+                    Some((BindingModifier::Plain, _, _)) => (), // Not mutable.
+                    Some((BindingModifier::Mutable, path, t_mutable)) => {
+                        self.ctx.define_mutable(path, t_mutable);
+                    }
                 }
 
                 // Check the result after defining so that if there was a type
@@ -91,18 +107,17 @@ impl TypeChecker {
                 self.check_expression(e1)?;
                 let t2 = self.check_expression(e2)?;
 
-                let id = match &**e1 {
-                    Expr::Variable(id) => id,
-                    _ => return Err(TypeErrorCause::new(&format!("Expected variable on left hand side of assignment, but found: {:?}", e1))),
-                };
+                // TODO: This should allow any place expression.  It should
+                // also check that it's mutable.
+                let path = Path::try_from(&**e1).map_err(|_| TypeErrorCause::new(&format!("Expected variable or place expression on left hand side of assignment, but found: {:?}", e1)))?;
 
-                match self.ctx.lookup_mutable(id) {
+                match self.ctx.lookup_mutable(&path) {
                     Some(t_expected) => {
                         if *t_expected != t2 {
                             return Err(TypeErrorCause::new(&format!("Left hand side of assignment expects type {:?} but right hand side has type {:?}", t_expected, t2)));
                         }
                     }
-                    None => return Err(TypeErrorCause::new(&format!("Expected mutable variable on left hand side of assignment: {}", id))),
+                    None => return Err(TypeErrorCause::new(&format!("Expected mutable place expression on left hand side of assignment: {}", path))),
                 }
 
                 Ok(Type::Unit)
@@ -133,11 +148,11 @@ impl TypeChecker {
                     }
                 }
             }
-            Expr::AddressOf(e) => {
+            Expr::AddressOf(m, e) => {
                 let t = self.check_expression(e)?;
 
                 if self.is_place_expression(e) {
-                    Ok(Type::RefPtr(Box::new(t)))
+                    Ok(Type::RefPtr(*m, Box::new(t)))
                 } else {
                     Err(TypeErrorCause::new(&format!("Expected place expression (like a local variable) after the borrow operator \"&\" but found: {:?}", e)))
                 }
@@ -147,7 +162,7 @@ impl TypeChecker {
 
                 if self.is_place_expression(e) {
                     match t {
-                        Type::RefPtr(t_inner) => Ok(*t_inner),
+                        Type::RefPtr(_, t_inner) => Ok(*t_inner),
                         _ => Err(TypeErrorCause::new(&format!("Dereference operator \"*\" expected a reference but found: {:?}", t))),
                     }
                 } else {
@@ -249,12 +264,42 @@ impl TypeChecker {
             Grouping(e) => self.is_place_expression(e),
             Assignment(_, _)
             | Binary(_, _, _)
-            | AddressOf(_)
+            | AddressOf(_, _)
             | Match(_, _)
             | LiteralInt(_)
             | LiteralBool(_)
             | Tuple0 => false,
             Variable(_) | Deref(_) => true,
+        }
+    }
+
+    // Say you have the following code:
+    //
+    //    let x: &mut i32 = ...;
+    //
+    // We want to return the fact that the path *x is a mutable path and that
+    // its type is i32.
+    fn mutable_path_and_type_from_type(&self, id: Identifier, t: &Type) -> Option<(BindingModifier, Path, Type)> {
+        match t {
+            Type::Bool => Some((BindingModifier::Plain, Path::Ident(id), Type::Bool)),
+            Type::Int => Some((BindingModifier::Plain, Path::Ident(id), Type::Int)),
+            Type::NamedType(tid) => Some((BindingModifier::Plain, Path::Ident(id), Type::NamedType(tid.to_string()))),
+            Type::RefPtr(m, t_sub) => {
+                match self.mutable_path_and_type_from_type(id, &t_sub) {
+                    None => None,
+                    Some((_, path, mut_type)) => {
+                        let path = Path::Deref(Box::new(path));
+                        let modifier = match m {
+                            RefPtrKind::Shared => BindingModifier::Plain,
+                            RefPtrKind::Mutable => BindingModifier::Mutable,
+                        };
+
+                        Some((modifier, path, mut_type))
+                    }
+                }
+            }
+            Type::Unit => Some((BindingModifier::Plain, Path::Ident(id), Type::Unit)),
+            Type::Variable(_) => panic!("mutable_path_and_type_from_type: found variable {:?}", t),
         }
     }
 
@@ -266,12 +311,40 @@ impl TypeChecker {
             Type::Bool => Ok(Type::Bool),
             Type::Int => Ok(Type::Int),
             Type::NamedType(id) => Ok(Type::NamedType(id.to_string())),
-            Type::RefPtr(t) => {
+            Type::RefPtr(m, t) => {
                 let t_evaled = self.eval_type(t)?;
-                Ok(Type::RefPtr(Box::new(t_evaled)))
+                Ok(Type::RefPtr(*m, Box::new(t_evaled)))
             }
             Type::Unit => Ok(Type::Unit),
             Type::Variable(id) => self.ctx.lookup_type(id).cloned().ok_or_else(|| TypeErrorCause::new(&format!("Unknown type: {}", id))),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Hash, Eq, PartialEq)]
+pub enum Path {
+    Ident(Identifier),
+    Deref(Box<Path>),
+}
+
+impl TryFrom<&Expr> for Path {
+    type Error = String;
+
+    fn try_from(exp: &Expr) -> Result<Self, Self::Error> {
+        match exp {
+            Expr::Deref(e) => Ok(Path::Deref(Box::new(Path::try_from(e.deref())?))),
+            Expr::Grouping(e) => Path::try_from(e.deref()),
+            Expr::Variable(id) => Ok(Path::Ident(id.to_string())),
+            _ => Err(format!("Couldn't create a path from expression: {:?}", exp).to_string()),
+        }
+    }
+}
+
+impl fmt::Display for Path {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Path::Ident(id) => write!(f, "{}", id),
+            Path::Deref(path) => write!(f, "*{}", path),
         }
     }
 }
@@ -280,7 +353,7 @@ impl TypeChecker {
 struct Context {
     exprs: HashMap<String, Type>,
     types: HashMap<String, Type>,
-    mutables: HashMap<String, Type>,
+    mutables: HashMap<Path, Type>,
 }
 
 impl Context {
@@ -300,8 +373,8 @@ impl Context {
         self.types.insert(id, typ);
     }
 
-    pub fn define_mutable(&mut self, id: String, typ: Type) {
-        self.mutables.insert(id, typ);
+    pub fn define_mutable(&mut self, path: Path, typ: Type) {
+        self.mutables.insert(path, typ);
     }
 
     pub fn lookup(&self, id: &str) -> Option<&Type> {
@@ -312,7 +385,7 @@ impl Context {
         self.types.get(id)
     }
 
-    pub fn lookup_mutable(&self, id: &str) -> Option<&Type> {
-        self.mutables.get(id)
+    pub fn lookup_mutable(&self, path: &Path) -> Option<&Type> {
+        self.mutables.get(path)
     }
 }
