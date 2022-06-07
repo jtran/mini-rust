@@ -6,8 +6,8 @@ edition = "2018"
 
 [dependencies]
 argparse = "0.2.2"
-lalrpop-util = "0.17.2"
+lalrpop-util = "0.19.8"
 regex = "1.5.5"
 
 [build-dependencies]
-lalrpop = "0.17.2"
+lalrpop = "0.19.8"
