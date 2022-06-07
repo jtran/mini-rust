@@ -9,7 +9,7 @@ use crate::ast::*;
 pub fn check(module: &Module) -> Result<(), TypeError> {
     let mut checker = TypeChecker::new();
 
-    checker.check(&module)
+    checker.check(module)
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -179,7 +179,7 @@ impl TypeChecker {
                     let mut ctx_to_drop = None;
                     match &arm.pattern {
                         Pattern::Constructor(ctor_id) => {
-                            let ctor_type = self.ctx.lookup(&ctor_id).ok_or_else(|| TypeErrorCause::new(&format!("Unknown constructor in pattern: {}", ctor_id)))?;
+                            let ctor_type = self.ctx.lookup(ctor_id).ok_or_else(|| TypeErrorCause::new(&format!("Unknown constructor in pattern: {}", ctor_id)))?;
                             if *ctor_type != t {
                                 return Err(TypeErrorCause::new(&format!("Constructor pattern {} of type {:?} does not match discriminant type {:?}", ctor_id, ctor_type, t)));
                             }
@@ -258,7 +258,7 @@ impl TypeChecker {
     // A place expression is an expression that represents a memory location.
     //
     // See https://doc.rust-lang.org/reference/expressions.html#place-expressions-and-value-expressions
-    fn is_place_expression(&mut self, expression: &Expr) -> bool {
+    fn is_place_expression(&self, expression: &Expr) -> bool {
         use Expr::*;
         match expression {
             Grouping(e) => self.is_place_expression(e),
@@ -285,7 +285,7 @@ impl TypeChecker {
             Type::Int => Some((BindingModifier::Plain, Path::Ident(id), Type::Int)),
             Type::NamedType(tid) => Some((BindingModifier::Plain, Path::Ident(id), Type::NamedType(tid.to_string()))),
             Type::RefPtr(m, t_sub) => {
-                match self.mutable_path_and_type_from_type(id, &t_sub) {
+                match self.mutable_path_and_type_from_type(id, t_sub) {
                     None => None,
                     Some((_, path, mut_type)) => {
                         let path = Path::Deref(Box::new(path));
@@ -335,7 +335,7 @@ impl TryFrom<&Expr> for Path {
             Expr::Deref(e) => Ok(Path::Deref(Box::new(Path::try_from(e.deref())?))),
             Expr::Grouping(e) => Path::try_from(e.deref()),
             Expr::Variable(id) => Ok(Path::Ident(id.to_string())),
-            _ => Err(format!("Couldn't create a path from expression: {:?}", exp).to_string()),
+            _ => Err(format!("Couldn't create a path from expression: {:?}", exp)),
         }
     }
 }

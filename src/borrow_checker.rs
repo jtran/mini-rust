@@ -9,7 +9,7 @@ type Identifier = String;
 pub fn check(module: &Module) -> Result<(), BorrowError> {
     let mut checker = BorrowChecker::new();
 
-    checker.check(&module)
+    checker.check(module)
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -67,7 +67,7 @@ impl BorrowChecker {
                         let borrow_type = BorrowType::from(m);
                         self.ctx.add_loan(loan, path.clone(), LoanState::Borrowed, borrow_type);
                         eprintln!("Adding active borrows path={:?}, loan={:?}", path, loan);
-                        self.ctx.add_active_borrow(path.clone(), &vec![loan]);
+                        self.ctx.add_active_borrow(path, &[loan]);
                     }
                     _ => (),
                 }
@@ -109,7 +109,7 @@ impl BorrowChecker {
                 self.ctx.add_loan(loan, path.clone(), LoanState::LentOut, borrow_type);
 
                 eprintln!("Adding active borrows path={:?}, loans={:?}", path, loan);
-                self.ctx.add_active_borrow(path, &vec![loan]);
+                self.ctx.add_active_borrow(path, &[loan]);
 
                 Ok(vec![loan])
             }
@@ -169,7 +169,7 @@ enum BorrowType {
 }
 
 impl BorrowType {
-    pub fn to_pretty_string(&self) -> String {
+    pub fn to_pretty_string(self) -> String {
         match self {
             BorrowType::Shared => "immutably".to_string(),
             BorrowType::Mutable => "mutably".to_string(),
@@ -210,7 +210,7 @@ enum LoanState {
 }
 
 impl LoanState {
-    pub fn to_pretty_string(&self) -> String {
+    pub fn to_pretty_string(self) -> String {
         match self {
             LoanState::LentOut => "lent out".to_string(),
             LoanState::Borrowed => "borrowed".to_string(),
@@ -298,12 +298,9 @@ impl Context {
 }
 
 fn op_conflicts(op: Operation, loan_state: LoanState, borrow_type: BorrowType) -> bool {
-    match (op, loan_state, borrow_type) {
-        (Operation::Read, LoanState::Borrowed, BorrowType::Shared)
-        | (Operation::Read, LoanState::Borrowed, BorrowType::Mutable)
-        | (Operation::Write, LoanState::Borrowed, BorrowType::Mutable)
-        | (Operation::Read, LoanState::LentOut, BorrowType::Shared)
-        => false,
-        _ => true,
-    }
+    !matches!((op, loan_state, borrow_type),
+              (Operation::Read, LoanState::Borrowed, BorrowType::Shared)
+              | (Operation::Read, LoanState::Borrowed, BorrowType::Mutable)
+              | (Operation::Write, LoanState::Borrowed, BorrowType::Mutable)
+              | (Operation::Read, LoanState::LentOut, BorrowType::Shared))
 }
