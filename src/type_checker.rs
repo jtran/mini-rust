@@ -78,7 +78,7 @@ impl TypeChecker {
                     }
                 }
 
-                match self.mutable_path_and_type_from_type(id.to_string(), &lhs_type) {
+                match mutable_path_and_type_from_type(id.to_string(), &lhs_type) {
                     None => (),
                     Some((BindingModifier::Plain, _, _)) => (), // Not mutable.
                     Some((BindingModifier::Mutable, path, t_mutable)) => {
@@ -151,7 +151,7 @@ impl TypeChecker {
             Expr::AddressOf(m, e) => {
                 let t = self.check_expression(e)?;
 
-                if self.is_place_expression(e) {
+                if is_place_expression(e) {
                     Ok(Type::RefPtr(*m, Box::new(t)))
                 } else {
                     Err(TypeErrorCause::new(&format!("Expected place expression (like a local variable) after the borrow operator \"&\" but found: {:?}", e)))
@@ -160,7 +160,7 @@ impl TypeChecker {
             Expr::Deref(e) => {
                 let t = self.check_expression(e)?;
 
-                if self.is_place_expression(e) {
+                if is_place_expression(e) {
                     match t {
                         Type::RefPtr(_, t_inner) => Ok(*t_inner),
                         _ => Err(TypeErrorCause::new(&format!("Dereference operator \"*\" expected a reference but found: {:?}", t))),
@@ -255,54 +255,6 @@ impl TypeChecker {
         result
     }
 
-    // A place expression is an expression that represents a memory location.
-    //
-    // See https://doc.rust-lang.org/reference/expressions.html#place-expressions-and-value-expressions
-    fn is_place_expression(&self, expression: &Expr) -> bool {
-        use Expr::*;
-        match expression {
-            Grouping(e) => self.is_place_expression(e),
-            Assignment(_, _)
-            | Binary(_, _, _)
-            | AddressOf(_, _)
-            | Match(_, _)
-            | LiteralInt(_)
-            | LiteralBool(_)
-            | Tuple0 => false,
-            Variable(_) | Deref(_) => true,
-        }
-    }
-
-    // Say you have the following code:
-    //
-    //    let x: &mut i32 = ...;
-    //
-    // We want to return the fact that the path *x is a mutable path and that
-    // its type is i32.
-    fn mutable_path_and_type_from_type(&self, id: Identifier, t: &Type) -> Option<(BindingModifier, Path, Type)> {
-        match t {
-            Type::Bool => Some((BindingModifier::Plain, Path::Ident(id), Type::Bool)),
-            Type::Int => Some((BindingModifier::Plain, Path::Ident(id), Type::Int)),
-            Type::NamedType(tid) => Some((BindingModifier::Plain, Path::Ident(id), Type::NamedType(tid.to_string()))),
-            Type::RefPtr(m, t_sub) => {
-                match self.mutable_path_and_type_from_type(id, t_sub) {
-                    None => None,
-                    Some((_, path, mut_type)) => {
-                        let path = Path::Deref(Box::new(path));
-                        let modifier = match m {
-                            RefPtrKind::Shared => BindingModifier::Plain,
-                            RefPtrKind::Mutable => BindingModifier::Mutable,
-                        };
-
-                        Some((modifier, path, mut_type))
-                    }
-                }
-            }
-            Type::Unit => Some((BindingModifier::Plain, Path::Ident(id), Type::Unit)),
-            Type::Variable(_) => panic!("mutable_path_and_type_from_type: found variable {:?}", t),
-        }
-    }
-
     // Evaluating types isn't so involved right now.  But if we ever add
     // higher-kinded types -- for example, generic data types -- we will
     // absolutely need it.
@@ -318,6 +270,54 @@ impl TypeChecker {
             Type::Unit => Ok(Type::Unit),
             Type::Variable(id) => self.ctx.lookup_type(id).cloned().ok_or_else(|| TypeErrorCause::new(&format!("Unknown type: {}", id))),
         }
+    }
+}
+
+// A place expression is an expression that represents a memory location.
+//
+// See https://doc.rust-lang.org/reference/expressions.html#place-expressions-and-value-expressions
+fn is_place_expression(expression: &Expr) -> bool {
+    use Expr::*;
+    match expression {
+        Grouping(e) => is_place_expression(e),
+        Assignment(_, _)
+        | Binary(_, _, _)
+        | AddressOf(_, _)
+        | Match(_, _)
+        | LiteralInt(_)
+        | LiteralBool(_)
+        | Tuple0 => false,
+        Variable(_) | Deref(_) => true,
+    }
+}
+
+// Say you have the following code:
+//
+//    let x: &mut i32 = ...;
+//
+// We want to return the fact that the path *x is a mutable path and that
+// its type is i32.
+fn mutable_path_and_type_from_type(id: Identifier, t: &Type) -> Option<(BindingModifier, Path, Type)> {
+    match t {
+        Type::Bool => Some((BindingModifier::Plain, Path::Ident(id), Type::Bool)),
+        Type::Int => Some((BindingModifier::Plain, Path::Ident(id), Type::Int)),
+        Type::NamedType(tid) => Some((BindingModifier::Plain, Path::Ident(id), Type::NamedType(tid.to_string()))),
+        Type::RefPtr(m, t_sub) => {
+            match mutable_path_and_type_from_type(id, t_sub) {
+                None => None,
+                Some((_, path, mut_type)) => {
+                    let path = Path::Deref(Box::new(path));
+                    let modifier = match m {
+                        RefPtrKind::Shared => BindingModifier::Plain,
+                        RefPtrKind::Mutable => BindingModifier::Mutable,
+                    };
+
+                    Some((modifier, path, mut_type))
+                }
+            }
+        }
+        Type::Unit => Some((BindingModifier::Plain, Path::Ident(id), Type::Unit)),
+        Type::Variable(_) => panic!("mutable_path_and_type_from_type: found variable {:?}", t),
     }
 }
 

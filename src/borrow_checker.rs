@@ -60,16 +60,13 @@ impl BorrowChecker {
             Stmt::Let(_, id, t, e) => {
                 self.check_expression(e)?;
 
-                match **t {
-                    Type::RefPtr(m, _) => {
-                        let loan = self.ctx.new_loan();
-                        let path = Path::from(id);
-                        let borrow_type = BorrowType::from(m);
-                        self.ctx.add_loan(loan, path.clone(), LoanState::Borrowed, borrow_type);
-                        eprintln!("Adding active borrows path={:?}, loan={:?}", path, loan);
-                        self.ctx.add_active_borrow(path, &[loan]);
-                    }
-                    _ => (),
+                if let Type::RefPtr(m, _) = **t {
+                    let loan = self.ctx.new_loan();
+                    let path = Path::from(id);
+                    let borrow_type = BorrowType::from(m);
+                    self.ctx.add_loan(loan, path.clone(), LoanState::Borrowed, borrow_type);
+                    eprintln!("Adding active borrows path={:?}, loan={:?}", path, loan);
+                    self.ctx.add_active_borrow(path, &[loan]);
                 }
 
                 Ok(())
