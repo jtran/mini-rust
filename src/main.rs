@@ -32,14 +32,18 @@ fn main() {
             Print(env!("CARGO_PKG_VERSION").to_string()),
             "Show version",
         );
-        ap.refer(&mut script_filename)
-            .add_argument("script_filename", Store, "Rust file to interpret");
+        ap.refer(&mut script_filename).add_argument(
+            "script_filename",
+            Store,
+            "Rust file to interpret",
+        );
         ap.parse_args_or_exit();
     }
 
     // Read the file.
-    let mut file = File::open(&script_filename)
-        .unwrap_or_else(|_| panic!("Source file not found: {}", script_filename));
+    let mut file = File::open(&script_filename).unwrap_or_else(|_| {
+        panic!("Source file not found: {}", script_filename)
+    });
     let mut contents = String::new();
     file.read_to_string(&mut contents)
         .unwrap_or_else(|_| panic!("Unable to read file: {}", script_filename));

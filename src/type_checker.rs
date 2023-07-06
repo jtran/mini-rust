@@ -24,7 +24,9 @@ pub struct TypeErrorCause {
 
 impl TypeErrorCause {
     pub fn new(msg: &str) -> TypeErrorCause {
-        TypeErrorCause { message: msg.to_string() }
+        TypeErrorCause {
+            message: msg.to_string(),
+        }
     }
 }
 
@@ -54,7 +56,10 @@ impl TypeChecker {
         }
     }
 
-    fn check_statement(&mut self, statement: &Stmt) -> Result<(), TypeErrorCause> {
+    fn check_statement(
+        &mut self,
+        statement: &Stmt,
+    ) -> Result<(), TypeErrorCause> {
         match statement {
             Stmt::Enum(id, ctors) => {
                 // TODO: save this definition.
@@ -78,7 +83,8 @@ impl TypeChecker {
                     }
                 }
 
-                match mutable_path_and_type_from_type(id.to_string(), &lhs_type) {
+                match mutable_path_and_type_from_type(id.to_string(), &lhs_type)
+                {
                     None => (),
                     Some((BindingModifier::Plain, _, _)) => (), // Not mutable.
                     Some((BindingModifier::Mutable, path, t_mutable)) => {
@@ -101,7 +107,10 @@ impl TypeChecker {
         }
     }
 
-    fn check_expression(&mut self, expression: &Expr, ) -> Result<Type, TypeErrorCause> {
+    fn check_expression(
+        &mut self,
+        expression: &Expr,
+    ) -> Result<Type, TypeErrorCause> {
         match expression {
             Expr::Assignment(e1, e2) => {
                 self.check_expression(e1)?;
@@ -179,7 +188,13 @@ impl TypeChecker {
                     let mut ctx_to_drop = None;
                     match &arm.pattern {
                         Pattern::Constructor(ctor_id) => {
-                            let ctor_type = self.ctx.lookup(ctor_id).ok_or_else(|| TypeErrorCause::new(&format!("Unknown constructor in pattern: {}", ctor_id)))?;
+                            let ctor_type =
+                                self.ctx.lookup(ctor_id).ok_or_else(|| {
+                                    TypeErrorCause::new(&format!(
+                                        "Unknown constructor in pattern: {}",
+                                        ctor_id
+                                    ))
+                                })?;
                             if *ctor_type != t {
                                 return Err(TypeErrorCause::new(&format!("Constructor pattern {} of type {:?} does not match discriminant type {:?}", ctor_id, ctor_type, t)));
                             }
@@ -224,7 +239,7 @@ impl TypeChecker {
                         // Check that all arms are the same.
                         for arm_type in arm_types.iter() {
                             if *arm_type != *t {
-                                return Err(TypeErrorCause::new(&format!("Match arm result type {:?} does not match previous arm type {:?}", arm_type, *t)))
+                                return Err(TypeErrorCause::new(&format!("Match arm result type {:?} does not match previous arm type {:?}", arm_type, *t)));
                             }
                         }
 
@@ -236,16 +251,21 @@ impl TypeChecker {
             Expr::LiteralInt(_) => Ok(Type::Int),
             Expr::LiteralBool(_) => Ok(Type::Bool),
             Expr::Tuple0 => Ok(Type::Unit),
-            Expr::Variable(id) => {
-                match self.ctx.lookup(id) {
-                    Some(t) => Ok(t.clone()),
-                    None => Err(TypeErrorCause::new(&format!("Unknown identifier {}", id))),
-                }
-            }
+            Expr::Variable(id) => match self.ctx.lookup(id) {
+                Some(t) => Ok(t.clone()),
+                None => Err(TypeErrorCause::new(&format!(
+                    "Unknown identifier {}",
+                    id
+                ))),
+            },
         }
     }
 
-    fn check_expression_in_ctx(&mut self, expression: &Expr, ctx: Context) -> Result<Type, TypeErrorCause> {
+    fn check_expression_in_ctx(
+        &mut self,
+        expression: &Expr,
+        ctx: Context,
+    ) -> Result<Type, TypeErrorCause> {
         let old_ctx = mem::replace(&mut self.ctx, ctx);
 
         let result = self.check_expression(expression);
@@ -268,7 +288,11 @@ impl TypeChecker {
                 Ok(Type::RefPtr(*m, Box::new(t_evaled)))
             }
             Type::Unit => Ok(Type::Unit),
-            Type::Variable(id) => self.ctx.lookup_type(id).cloned().ok_or_else(|| TypeErrorCause::new(&format!("Unknown type: {}", id))),
+            Type::Variable(id) => {
+                self.ctx.lookup_type(id).cloned().ok_or_else(|| {
+                    TypeErrorCause::new(&format!("Unknown type: {}", id))
+                })
+            }
         }
     }
 }
@@ -297,11 +321,20 @@ fn is_place_expression(expression: &Expr) -> bool {
 //
 // We want to return the fact that the path *x is a mutable path and that
 // its type is i32.
-fn mutable_path_and_type_from_type(id: Identifier, t: &Type) -> Option<(BindingModifier, Path, Type)> {
+fn mutable_path_and_type_from_type(
+    id: Identifier,
+    t: &Type,
+) -> Option<(BindingModifier, Path, Type)> {
     match t {
-        Type::Bool => Some((BindingModifier::Plain, Path::Ident(id), Type::Bool)),
+        Type::Bool => {
+            Some((BindingModifier::Plain, Path::Ident(id), Type::Bool))
+        }
         Type::Int => Some((BindingModifier::Plain, Path::Ident(id), Type::Int)),
-        Type::NamedType(tid) => Some((BindingModifier::Plain, Path::Ident(id), Type::NamedType(tid.to_string()))),
+        Type::NamedType(tid) => Some((
+            BindingModifier::Plain,
+            Path::Ident(id),
+            Type::NamedType(tid.to_string()),
+        )),
         Type::RefPtr(m, t_sub) => {
             match mutable_path_and_type_from_type(id, t_sub) {
                 None => None,
@@ -316,8 +349,12 @@ fn mutable_path_and_type_from_type(id: Identifier, t: &Type) -> Option<(BindingM
                 }
             }
         }
-        Type::Unit => Some((BindingModifier::Plain, Path::Ident(id), Type::Unit)),
-        Type::Variable(_) => panic!("mutable_path_and_type_from_type: found variable {:?}", t),
+        Type::Unit => {
+            Some((BindingModifier::Plain, Path::Ident(id), Type::Unit))
+        }
+        Type::Variable(_) => {
+            panic!("mutable_path_and_type_from_type: found variable {:?}", t)
+        }
     }
 }
 
@@ -332,10 +369,15 @@ impl TryFrom<&Expr> for Path {
 
     fn try_from(exp: &Expr) -> Result<Self, Self::Error> {
         match exp {
-            Expr::Deref(e) => Ok(Path::Deref(Box::new(Path::try_from(e.deref())?))),
+            Expr::Deref(e) => {
+                Ok(Path::Deref(Box::new(Path::try_from(e.deref())?)))
+            }
             Expr::Grouping(e) => Path::try_from(e.deref()),
             Expr::Variable(id) => Ok(Path::Ident(id.to_string())),
-            _ => Err(format!("Couldn't create a path from expression: {:?}", exp)),
+            _ => Err(format!(
+                "Couldn't create a path from expression: {:?}",
+                exp
+            )),
         }
     }
 }

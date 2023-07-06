@@ -24,7 +24,9 @@ pub struct BorrowErrorCause {
 
 impl BorrowErrorCause {
     pub fn new(msg: &str) -> BorrowErrorCause {
-        BorrowErrorCause { message: msg.to_string() }
+        BorrowErrorCause {
+            message: msg.to_string(),
+        }
     }
 }
 
@@ -54,7 +56,10 @@ impl BorrowChecker {
         }
     }
 
-    fn check_statement(&mut self, statement: &Stmt) -> Result<(), BorrowErrorCause> {
+    fn check_statement(
+        &mut self,
+        statement: &Stmt,
+    ) -> Result<(), BorrowErrorCause> {
         match statement {
             Stmt::Enum(_, _) => Ok(()),
             Stmt::Let(_, id, t, e) => {
@@ -64,8 +69,16 @@ impl BorrowChecker {
                     let loan = self.ctx.new_loan();
                     let path = Path::from(id);
                     let borrow_type = BorrowType::from(m);
-                    self.ctx.add_loan(loan, path.clone(), LoanState::Borrowed, borrow_type);
-                    eprintln!("Adding active borrows path={:?}, loan={:?}", path, loan);
+                    self.ctx.add_loan(
+                        loan,
+                        path.clone(),
+                        LoanState::Borrowed,
+                        borrow_type,
+                    );
+                    eprintln!(
+                        "Adding active borrows path={:?}, loan={:?}",
+                        path, loan
+                    );
                     self.ctx.add_active_borrow(path, &[loan]);
                 }
 
@@ -75,7 +88,10 @@ impl BorrowChecker {
         }
     }
 
-    fn check_expression(&mut self, expression: &Expr) -> Result<Vec<Loan>, BorrowErrorCause> {
+    fn check_expression(
+        &mut self,
+        expression: &Expr,
+    ) -> Result<Vec<Loan>, BorrowErrorCause> {
         match expression {
             Expr::Assignment(e1, e2) => {
                 let mut loans = self.check_expression(e1)?;
@@ -85,7 +101,12 @@ impl BorrowChecker {
                 match self.ctx.conflicts(&path, Operation::Write) {
                     None => (),
                     Some((loan_state, borrow_type)) => {
-                        return Err(BorrowErrorCause::new(&format!("Can't write to {} while it is {} {}", path, borrow_type.to_pretty_string(), loan_state.to_pretty_string())));
+                        return Err(BorrowErrorCause::new(&format!(
+                            "Can't write to {} while it is {} {}",
+                            path,
+                            borrow_type.to_pretty_string(),
+                            loan_state.to_pretty_string()
+                        )));
                     }
                 }
 
@@ -103,9 +124,17 @@ impl BorrowChecker {
                 let loan = self.ctx.new_loan();
                 let path = path_from_exp(e);
                 let borrow_type = BorrowType::from(*m);
-                self.ctx.add_loan(loan, path.clone(), LoanState::LentOut, borrow_type);
+                self.ctx.add_loan(
+                    loan,
+                    path.clone(),
+                    LoanState::LentOut,
+                    borrow_type,
+                );
 
-                eprintln!("Adding active borrows path={:?}, loans={:?}", path, loan);
+                eprintln!(
+                    "Adding active borrows path={:?}, loans={:?}",
+                    path, loan
+                );
                 self.ctx.add_active_borrow(path, &[loan]);
 
                 Ok(vec![loan])
@@ -116,7 +145,12 @@ impl BorrowChecker {
                 match self.ctx.conflicts(&path, Operation::Read) {
                     None => (),
                     Some((loan_state, borrow_type)) => {
-                        return Err(BorrowErrorCause::new(&format!("Can't read {} while it is {} {}", path, borrow_type.to_pretty_string(), loan_state.to_pretty_string())));
+                        return Err(BorrowErrorCause::new(&format!(
+                            "Can't read {} while it is {} {}",
+                            path,
+                            borrow_type.to_pretty_string(),
+                            loan_state.to_pretty_string()
+                        )));
                     }
                 }
 
@@ -139,7 +173,12 @@ impl BorrowChecker {
                 match self.ctx.conflicts(&path, Operation::Read) {
                     None => (),
                     Some((loan_state, borrow_type)) => {
-                        return Err(BorrowErrorCause::new(&format!("Can't read {} while it is {} {}", path, borrow_type.to_pretty_string(), loan_state.to_pretty_string())));
+                        return Err(BorrowErrorCause::new(&format!(
+                            "Can't read {} while it is {} {}",
+                            path,
+                            borrow_type.to_pretty_string(),
+                            loan_state.to_pretty_string()
+                        )));
                     }
                 }
 
@@ -249,13 +288,19 @@ impl Context {
         loan
     }
 
-    pub fn add_loan(&mut self, loan: Loan,
-                    path: Path, loan_state: LoanState, typ: BorrowType) {
+    pub fn add_loan(
+        &mut self,
+        loan: Loan,
+        path: Path,
+        loan_state: LoanState,
+        typ: BorrowType,
+    ) {
         self.loans.insert(loan, (path, loan_state, typ));
     }
 
     pub fn add_active_borrow(&mut self, path: Path, loans: &[Loan]) {
-        self.active_borrows.entry(path)
+        self.active_borrows
+            .entry(path)
             .and_modify(|region| {
                 for loan in loans {
                     region.add(*loan);
@@ -270,7 +315,11 @@ impl Context {
             });
     }
 
-    pub fn conflicts(&self, path: &Path, op: Operation) -> Option<(LoanState, BorrowType)> {
+    pub fn conflicts(
+        &self,
+        path: &Path,
+        op: Operation,
+    ) -> Option<(LoanState, BorrowType)> {
         eprintln!("Checking for conflict path={:?}, op={:?}", path, op);
         match self.active_borrows.get(path) {
             None => None,
@@ -278,7 +327,10 @@ impl Context {
                 eprintln!("  Found region with {} loans", region.loans().len());
                 for loan in region.loans() {
                     match self.loans.get(loan) {
-                        None => panic!("Couldn't find loan in context loans: {:?}", loan),
+                        None => panic!(
+                            "Couldn't find loan in context loans: {:?}",
+                            loan
+                        ),
                         Some((path, loan_state, borrow_type)) => {
                             eprintln!("  Found active borrow: path={:?}, loan_state={:?}, borrow_type={:?}, op={:?}", path, loan_state, borrow_type, op);
                             if op_conflicts(op, *loan_state, *borrow_type) {
@@ -294,10 +346,16 @@ impl Context {
     }
 }
 
-fn op_conflicts(op: Operation, loan_state: LoanState, borrow_type: BorrowType) -> bool {
-    !matches!((op, loan_state, borrow_type),
-              (Operation::Read, LoanState::Borrowed, BorrowType::Shared)
-              | (Operation::Read, LoanState::Borrowed, BorrowType::Mutable)
-              | (Operation::Write, LoanState::Borrowed, BorrowType::Mutable)
-              | (Operation::Read, LoanState::LentOut, BorrowType::Shared))
+fn op_conflicts(
+    op: Operation,
+    loan_state: LoanState,
+    borrow_type: BorrowType,
+) -> bool {
+    !matches!(
+        (op, loan_state, borrow_type),
+        (Operation::Read, LoanState::Borrowed, BorrowType::Shared)
+            | (Operation::Read, LoanState::Borrowed, BorrowType::Mutable)
+            | (Operation::Write, LoanState::Borrowed, BorrowType::Mutable)
+            | (Operation::Read, LoanState::LentOut, BorrowType::Shared)
+    )
 }
